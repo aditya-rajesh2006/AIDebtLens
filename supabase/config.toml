@@ -1,0 +1,22 @@
+project_id = "zpivmylemisohbrkqxry"
+
+[functions.analyze-repo]
+verify_jwt = false
+
+[functions.analyze-code]
+verify_jwt = false
+
+[functions.analyze-commits]
+verify_jwt = false
+
+[functions.ai-detect]
+verify_jwt = false
+
+[functions.human-cognitive-model]
+verify_jwt = false
+
+[functions.train-cognitive-model]
+verify_jwt = false
+
+[functions.cognitive-predict]
+verify_jwt = false
