@@ -302,15 +302,25 @@ How much technical debt and cognitive debt is being introduced, especially in co
 The present implementation already includes strict AI detection signals, normalized debt scoring, hybrid single-file analysis, history tracking, deep cognitive views, and interactive visualizations that make the results easier to inspect and act on.
 
 ## Pictures
-
+ - Home Page
 ![Home Page](assets/HomePage.jpg)
+ - Dashboard
 ![Dashboard](assets/Dashboard.jpg)
+ - Values
 ![Values](assets/Values.jpg)
+ - Graph
 ![Graph](assets/Graph.jpg)
+ - FileAnalysis
 ![FileAnalysis](assets/FileAnalysis.jpg)
+ - Timeline
 ![Timeline](assets/Timeline.jpg)
+ - FixPlan
 ![FixPlan](assets/FixPlan.jpg)
+ - DebtGraph
 ![DebtGraph](assets/DebtGraph.jpg)
+ - CognitiveDebt
 ![CognitiveDebt](assets/CognitiveDebt.jpg)
+ - Pipeline
 ![Pipeline](assets/Pipeline.jpg)
+ - About Page
 ![About Page](assets/About.jpg)
