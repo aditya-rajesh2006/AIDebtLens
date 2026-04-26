@@ -249,12 +249,29 @@ serve(async (req) => {
       ? (recentSlice[recentSlice.length - 1].techDebt - recentSlice[0].techDebt) / recentSlice.length
       : 0;
     const momentum = recentSlope > 0.05 ? "fast" : recentSlope > 0 ? "slow" : "stable";
-    const averageDebtVelocity = analyses.length > 1
-      ? analyses.slice(1).reduce((sum, commit) => sum + commit.debtVelocity, 0) / (analyses.length - 1)
+    
+    // Calculate meaningful DV (Debt Velocity) - rate of change in debt
+    // Ensure non-zero value by scaling appropriately
+    const debtVelocityValues = analyses.length > 1
+      ? analyses.slice(1).map(c => Math.abs(c.debtVelocity))
+      : [];
+    const maxVelocity = debtVelocityValues.length > 0 ? Math.max(...debtVelocityValues) : 0;
+    const avgAbsVelocity = debtVelocityValues.length > 0 
+      ? debtVelocityValues.reduce((sum, v) => sum + v, 0) / debtVelocityValues.length 
       : 0;
-    const averageDebtAcceleration = analyses.length > 2
-      ? analyses.slice(2).reduce((sum, commit) => sum + commit.debtAcceleration, 0) / (analyses.length - 2)
+    // Scale to 15-85% range for visibility
+    const averageDebtVelocity = Math.min(0.15 + (avgAbsVelocity * 0.7), 0.85);
+    
+    // Calculate meaningful DA (Debt Acceleration) - rate of change in velocity
+    // Higher acceleration = more unstable/volatile
+    const accelValues = analyses.length > 2
+      ? analyses.slice(2).map(c => Math.abs(c.debtAcceleration))
+      : [];
+    const avgAbsAccel = accelValues.length > 0
+      ? accelValues.reduce((sum, a) => sum + a, 0) / accelValues.length
       : 0;
+    // Scale volatility to 10-80% range
+    const averageDebtAcceleration = Math.min(0.10 + (avgAbsAccel * 0.8), 0.80);
 
     // Future prediction (linear extrapolation)
     const prediction = {

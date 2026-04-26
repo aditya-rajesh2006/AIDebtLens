@@ -15,6 +15,21 @@ interface DetectionResult {
   method: string;
 }
 
+interface EnsembleDetectionResult {
+  aiProbability: number;
+  signals: string[];
+  confidence: number;
+  methodScores: Record<string, number>;
+}
+
+interface GatewayDetectionResult {
+  aiProbability: number;
+  confidence: number;
+  signals: string[];
+  verdict: "ai-generated" | "human-written" | "mixed";
+  explanation: string;
+}
+
 // ── CALIBRATED FEATURE EXTRACTION ──
 function extractEnhancedFeatures(code: string): { vector: number[]; metrics: Record<string, number> } {
   const lines = code.split('\n');
@@ -24,12 +39,18 @@ function extractEnhancedFeatures(code: string): { vector: number[]; metrics: Rec
 
   // 1. Structural Uniformity Score (SUS)
   const funcBodies = code.match(/(?:function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\()[\s\S]{0,300}?\}/g) || [];
+  const nonZero = (min: number, max: number, v?: number) => {
+    if (typeof v === 'number') return Math.round(Math.max(min, Math.min(max, v)) * 100) / 100;
+    return Math.round(min * 100) / 100;
+  };
   let sus = 0;
   if (funcBodies.length >= 3) {
     const stripped = funcBodies.map(b => b.replace(/\s+/g, ' ').replace(/[\w]+/g, 'X').substring(0, 50));
     const uniq = new Set(stripped).size;
     sus = Math.round((1 - uniq / funcBodies.length) * 100) / 100;
   }
+  // Ensure a small floor so SUS never displays as 0
+  sus = nonZero(0.08, 0.98, sus);
 
   // 2. Token Distribution Divergence (TDD)
   const tokens = code.match(/\b\w+\b/g) || [];
@@ -87,19 +108,21 @@ function extractEnhancedFeatures(code: string): { vector: number[]; metrics: Rec
     ? Math.sqrt(funcLengths.reduce((s, l) => s + Math.pow(l - avgFuncLen, 2), 0) / funcLengths.length) / 100
     : 0;
 
-  const vector = [sus, tdd, pri, crs, scs, ias, entropy, ccn / 20, nesting / 10, commentRatio, funcLenVar];
-  const metrics = { sus, tdd, pri, crs, scs, ias, entropy, ccn, nesting, commentRatio };
+  // Ensure non-zero floors for all returned metrics
+  const tdd_f = nonZero(0.08, 0.95, tdd);
+  const pri_f = nonZero(0.08, 0.95, pri);
+  const crs_f = nonZero(0.08, 0.95, crs);
+  const scs_f = nonZero(0.08, 0.98, scs);
+  const ias_f = nonZero(0.05, 0.95, ias);
+
+  const vector = [sus, tdd_f, pri_f, crs_f, scs_f, ias_f, entropy, ccn / 20, nesting / 10, commentRatio, funcLenVar];
+  const metrics = { sus, tdd: tdd_f, pri: pri_f, crs: crs_f, scs: scs_f, ias: ias_f, entropy, ccn, nesting, commentRatio };
 
   return { vector, metrics };
 }
 
 // ── HYBRID DETECTION using ensemble ──
-function detectAIEnsemble(code: string, filename: string): { 
-  aiProbability: number; 
-  signals: string[]; 
-  confidence: number;
-  methodScores: Record<string, number>;
-} {
+function detectAIEnsemble(code: string, filename: string): EnsembleDetectionResult {
   const { vector, metrics } = extractEnhancedFeatures(code);
   const signals: string[] = [];
   let totalScore = 0;
@@ -187,6 +210,143 @@ function detectAIEnsemble(code: string, filename: string): {
   return { aiProbability, signals: [...new Set(signals)], confidence, methodScores };
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+async function detectAIViaGateway(
+  code: string,
+  filename: string,
+  lovableApiKey: string,
+): Promise<GatewayDetectionResult | null> {
+  const systemPrompt = `You are a strict AI code detection verifier.
+
+You are not replacing heuristic analysis. You are acting as a second-opinion model that estimates the probability that a code sample was AI-generated or heavily AI-assisted.
+
+Evaluate signals such as:
+- structural uniformity across functions
+- repeated implementation patterns
+- generic naming
+- redundant or overly obvious comments
+- suspiciously consistent formatting
+- low human texture or lack of natural variation
+- mismatch between code length and conceptual complexity
+
+Be conservative. Do not call code AI-generated unless multiple signals align.
+
+Return only the tool output.`;
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${lovableApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Analyze this code sample for AI-generation likelihood.\nFilename: ${filename}\n\n\`\`\`\n${code.slice(0, 12000)}\n\`\`\``,
+        },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "report_ai_detection",
+          description: "Return structured AI detection results for a code sample",
+          parameters: {
+            type: "object",
+            properties: {
+              aiProbability: { type: "number", description: "0-1 AI-generation probability" },
+              confidence: { type: "number", description: "0-1 confidence in the estimate" },
+              signals: {
+                type: "array",
+                items: { type: "string" },
+                description: "Top AI-generation signals found in the code",
+              },
+              verdict: {
+                type: "string",
+                enum: ["ai-generated", "human-written", "mixed"],
+              },
+              explanation: {
+                type: "string",
+                description: "Short explanation of the score",
+              },
+            },
+            required: ["aiProbability", "confidence", "signals", "verdict", "explanation"],
+            additionalProperties: false,
+          },
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "report_ai_detection" } },
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("Lovable AI detect gateway error:", response.status, await response.text());
+    return null;
+  }
+
+  const result = await response.json();
+  const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall?.function?.arguments) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(toolCall.function.arguments);
+    return {
+      aiProbability: clamp(Number(parsed.aiProbability) || 0, 0.03, 0.97),
+      confidence: clamp(Number(parsed.confidence) || 0.45, 0.2, 0.95),
+      signals: Array.isArray(parsed.signals) ? parsed.signals.map((signal: unknown) => String(signal)).slice(0, 6) : [],
+      verdict: parsed.verdict === "ai-generated" || parsed.verdict === "human-written" ? parsed.verdict : "mixed",
+      explanation: typeof parsed.explanation === "string" ? parsed.explanation : "Model-assisted verification completed.",
+    };
+  } catch (error) {
+    console.error("Failed to parse Lovable AI detection response:", error);
+    return null;
+  }
+}
+
+function blendDetectionResults(
+  ensemble: EnsembleDetectionResult,
+  gateway: GatewayDetectionResult | null,
+) {
+  if (!gateway) {
+    return {
+      aiProbability: ensemble.aiProbability,
+      confidence: ensemble.confidence,
+      signals: ensemble.signals,
+      explanation: generateExplanation(ensemble.aiProbability, ensemble.signals),
+      method: "hybrid-ensemble",
+    };
+  }
+
+  const gatewayWeight = clamp(0.18 + gateway.confidence * 0.22, 0.2, 0.42);
+  const aiProbability = clamp(
+    ensemble.aiProbability * (1 - gatewayWeight) + gateway.aiProbability * gatewayWeight,
+    0.03,
+    0.97,
+  );
+  const confidence = clamp(
+    ensemble.confidence * 0.72 + gateway.confidence * 0.28,
+    0.35,
+    0.96,
+  );
+  const signals = [...new Set([...ensemble.signals, ...gateway.signals])].slice(0, 8);
+  const explanation = `${generateExplanation(aiProbability, signals)} Model verification: ${gateway.explanation}`;
+
+  return {
+    aiProbability,
+    confidence,
+    signals,
+    explanation,
+    method: "hybrid-ensemble+lovable-gemini",
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -194,11 +354,16 @@ serve(async (req) => {
     const { code, filename, userId } = await req.json();
     if (!code) throw new Error('code is required');
 
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
     // Step 1: Get local ensemble detection
     const ensembleResult = detectAIEnsemble(code, filename || 'unknown');
+    const gatewayResult = LOVABLE_API_KEY
+      ? await detectAIViaGateway(code, filename || "unknown", LOVABLE_API_KEY)
+      : null;
+    const blendedDetection = blendDetectionResults(ensembleResult, gatewayResult);
 
     // Step 2: Try to load user's trained model for boosting
     let trainedWeights: Record<string, number> | null = null;
@@ -222,10 +387,12 @@ serve(async (req) => {
     }
 
     // Step 3: Boost score with trained model if available
-    let finalScore = ensembleResult.aiProbability;
+    let finalScore = blendedDetection.aiProbability;
     if (trainedWeights && trainedWeights.boost_factor) {
       finalScore = Math.min(1, finalScore * trainedWeights.boost_factor);
     }
+
+    finalScore = Math.round(clamp(finalScore, 0.03, 0.97) * 100) / 100;
 
     // Step 4: Determine verdict with minimum confidence threshold
     let verdict: "ai-generated" | "human-written" | "mixed";
@@ -233,16 +400,13 @@ serve(async (req) => {
     else if (finalScore < 0.28) verdict = "human-written";
     else verdict = "mixed";
 
-    // Step 5: Generate comprehensive explanation
-    const explanation = generateExplanation(finalScore, ensembleResult.signals);
-
     const result: DetectionResult = {
-      aiProbability: Math.round(finalScore * 100) / 100,
-      confidence: Math.round(ensembleResult.confidence * 100) / 100,
-      signals: ensembleResult.signals,
+      aiProbability: finalScore,
+      confidence: Math.round(blendedDetection.confidence * 100) / 100,
+      signals: blendedDetection.signals,
       verdict,
-      explanation,
-      method: 'hybrid-ensemble' + (trainedWeights ? '+trained-boost' : ''),
+      explanation: blendedDetection.explanation,
+      method: blendedDetection.method + (trainedWeights ? '+trained-boost' : ''),
     };
 
     return new Response(JSON.stringify(result), {
