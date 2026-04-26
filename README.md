@@ -300,3 +300,17 @@ AI Debt Lens is currently a hybrid code analysis dashboard focused on one core q
 How much technical debt and cognitive debt is being introduced, especially in code that may be AI-generated?
  
 The present implementation already includes strict AI detection signals, normalized debt scoring, hybrid single-file analysis, history tracking, deep cognitive views, and interactive visualizations that make the results easier to inspect and act on.
+
+## Pictures
+
+![Home Page](assets/HomePage.jpg)
+![Dashboard](assets/Dashboard.jpg)
+![Values](assets/Values.jpg)
+![Graph](assets/Graph.jpg)
+![FileAnalysis](assets/FileAnalysis.jpg)
+![Timeline](assets/Timeline.jpg)
+![FixPlan](assets/FixPlan.jpg)
+![DebtGraph](assets/DebtGraph.jpg)
+![CognitiveDebt](assets/CognitiveDebt.jpg)
+![Pipeline](assets/Pipeline.jpg)
+![About Page](assets/About.jpg)
