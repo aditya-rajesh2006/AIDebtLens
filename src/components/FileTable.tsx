@@ -67,7 +67,7 @@ export default function FileTable({ files, selectedFile, onSelectFile }: Props) 
   }, [selectedFile]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-auto px-2 sm:px-0">
       {confusionHotspots.length > 0 && (
         <div className="rounded-xl border border-neon-purple/20 bg-neon-purple/5 backdrop-blur-sm p-4">
           <div className="flex items-center gap-2 mb-3">

@@ -630,8 +630,9 @@ export default function Dashboard() {
                   <div className="grid gap-6 lg:grid-cols-3">
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 lg:col-span-2 card-hover">
                       <h3 className="mb-4 text-sm font-semibold text-foreground">Debt Distribution by File</h3>
-                      <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={chartData} barGap={2} onClick={(e:any) => {
+                      <div className="h-48 sm:h-56 lg:h-60">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} barGap={2} onClick={(e:any) => {
                           const id = e?.activePayload?.[0]?.payload?.id;
                           if (id) { setSelectedFile(id); setActiveTab('files'); }
                         }}>
@@ -648,19 +649,24 @@ export default function Dashboard() {
                             {chartData?.map((_, i) => <Cell key={i} fill="hsl(270, 72%, 62%)" fillOpacity={0.75} />)}
                           </Bar>
                         </BarChart>
-                      </ResponsiveContainer>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </motion.div>
 
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 card-hover">
                       <h3 className="mb-4 text-sm font-semibold text-foreground">Debt DNA</h3>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <PieChart>
+                      <div className="h-44 sm:h-52 lg:h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
                           <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value">
                             {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                           </Pie>
                           <Tooltip contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 11 }} />
                         </PieChart>
-                      </ResponsiveContainer>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
                       <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground">
                         {pieData.map(d => (
                           <span key={d.name} className="flex items-center gap-2">
@@ -676,8 +682,9 @@ export default function Dashboard() {
                   <div className="grid gap-6 lg:grid-cols-3">
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 card-hover">
                       <h3 className="mb-4 text-sm font-semibold text-foreground">Debt DNA Radar</h3>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <RadarChart data={radarData}>
+                      <div className="h-48 sm:h-56 lg:h-60">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={radarData}>
                           <PolarGrid stroke="hsl(var(--border))" />
                           <PolarAngleAxis dataKey="metric" tick={({ x, y, payload, textAnchor }: any) => (
                             <text x={x} y={y} textAnchor={textAnchor} fill={tickColor} fontSize={9} className="cursor-help">
@@ -691,13 +698,16 @@ export default function Dashboard() {
                             `${value}%`, METRIC_FULL_NAMES[props.payload?.metric] || props.payload?.metric
                           ]} />
                         </RadarChart>
-                      </ResponsiveContainer>
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </motion.div>
 
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }} className="rounded-xl border border-primary/20 bg-primary/5 backdrop-blur-sm p-4 card-hover">
                       <h3 className="mb-2 text-sm font-semibold text-foreground">🤖 AI Detection Radar</h3>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <RadarChart data={aiRadarData}>
+                      <div className="h-40 sm:h-48 lg:h-52">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={aiRadarData}>
                           <PolarGrid stroke="hsl(var(--border))" />
                           <PolarAngleAxis dataKey="metric" tick={({ x, y, payload, textAnchor }: any) => (
                             <text x={x} y={y} textAnchor={textAnchor} fill={tickColor} fontSize={9} className="cursor-help">
@@ -711,7 +721,9 @@ export default function Dashboard() {
                             `${value}%`, METRIC_FULL_NAMES[props.payload?.metric] || props.payload?.metric
                           ]} />
                         </RadarChart>
-                      </ResponsiveContainer>
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
                       <div className="text-center mt-1">
                         <span className="text-2xl font-black font-mono text-primary">{(data.summary.avgAiLikelihood * 100).toFixed(0)}%</span>
                         <p className="text-[10px] text-muted-foreground">AI Generated Code</p>
@@ -720,7 +732,7 @@ export default function Dashboard() {
 
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 card-hover">
                       <h3 className="mb-4 text-sm font-semibold text-foreground">Debt Heatmap</h3>
-                      <div className="grid grid-cols-5 gap-1.5">
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                         {heatmapData?.map((f, i) => {
                           const intensity = f.debt / 100;
                           const hue = 174 - intensity * 174;
