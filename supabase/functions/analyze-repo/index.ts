@@ -52,6 +52,16 @@ interface PropagationEdge {
 }
 
 const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN") || "";
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+
+interface SemanticNamingAssessment {
+  filename: string;
+  semanticNameAlignment: number;
+  intentClarity: number;
+  namingNaturalness: number;
+  semanticMismatches: string[];
+  explanation: string;
+}
 
 async function fetchGitHub(url: string) {
   const headers: Record<string, string> = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'AIDebtTracker' };
@@ -286,6 +296,192 @@ function identifiersWithIntent(content: string): number {
   );
 
   return Math.round(Math.min(domainLike.length / identifiers.length, 1) * 100) / 100;
+}
+
+function clampMetric(value: number, min = 0.08, max = 0.98) {
+  return Math.min(max, Math.max(min, value));
+}
+
+async function analyzeSemanticNamingViaGateway(
+  files: Array<{ filename: string; content: string }>,
+  lovableApiKey: string,
+): Promise<Map<string, SemanticNamingAssessment>> {
+  const results = new Map<string, SemanticNamingAssessment>();
+  if (!lovableApiKey || files.length === 0) return results;
+
+  const systemPrompt = `You are a strict semantic code reviewer.
+
+Your job is to judge whether variable names, function names, and local abstractions actually match what the code does.
+
+Focus on semantic alignment, not style alone:
+- detect when names look descriptive but point to the wrong behavior
+- detect when names hide the real purpose of the logic
+- detect when the implementation intent is clear only after reading the body
+- be conservative and evidence-based
+
+Example of a semantic mismatch:
+- a function named checkPrime that really checks for palindromes
+
+Return only the tool output.`;
+
+  const batchSize = 3;
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    const fileDescriptions = batch.map((file, index) =>
+      `--- File ${index + 1}: ${file.filename} ---\n\`\`\`\n${file.content.slice(0, 4000)}\n\`\`\``
+    ).join("\n\n");
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: `Review these files for semantic naming alignment.\n\n${fileDescriptions}`,
+            },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "report_semantic_naming",
+              description: "Return semantic naming alignment results for the provided files",
+              parameters: {
+                type: "object",
+                properties: {
+                  files: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        filename: { type: "string" },
+                        semanticNameAlignment: { type: "number", description: "0-1 score for whether names match behavior" },
+                        intentClarity: { type: "number", description: "0-1 score for whether the true purpose is easy to infer" },
+                        namingNaturalness: { type: "number", description: "0-1 score for whether names feel human and context-aware" },
+                        semanticMismatches: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Short examples of misleading or mismatched identifiers",
+                        },
+                        explanation: { type: "string", description: "Brief explanation of the judgment" },
+                      },
+                      required: ["filename", "semanticNameAlignment", "intentClarity", "namingNaturalness", "semanticMismatches", "explanation"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["files"],
+                additionalProperties: false,
+              },
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "report_semantic_naming" } },
+        }),
+      });
+
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const toolCall = payload.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall?.function?.arguments) continue;
+
+      const parsed = JSON.parse(toolCall.function.arguments);
+      const parsedFiles = Array.isArray(parsed.files) ? parsed.files : [];
+
+      for (const item of parsedFiles) {
+        const filename = String(item?.filename || "");
+        if (!filename) continue;
+        results.set(filename, {
+          filename,
+          semanticNameAlignment: r(clampMetric(Number(item?.semanticNameAlignment) || 0.5, 0.08, 0.98)),
+          intentClarity: r(clampMetric(Number(item?.intentClarity) || 0.5, 0.08, 0.98)),
+          namingNaturalness: r(clampMetric(Number(item?.namingNaturalness) || 0.5, 0.08, 0.98)),
+          semanticMismatches: Array.isArray(item?.semanticMismatches)
+            ? item.semanticMismatches.map((entry: unknown) => String(entry)).slice(0, 3)
+            : [],
+          explanation: typeof item?.explanation === "string" ? item.explanation : "Semantic naming review completed.",
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return results;
+}
+
+function applySemanticAssessment(file: FileAnalysis, assessment: SemanticNamingAssessment): FileAnalysis {
+  const semanticAlignment = assessment.semanticNameAlignment;
+  const intentClarity = assessment.intentClarity;
+  const namingNaturalness = assessment.namingNaturalness;
+  const es = r(clampMetric(file.metrics.es * 0.35 + semanticAlignment * 0.45 + namingNaturalness * 0.20, 0.12, 0.95));
+  const ias = r(clampMetric(file.metrics.ias * 0.45 + (1 - semanticAlignment) * 0.35 + (1 - namingNaturalness) * 0.20, 0.08, 0.95));
+  const ird = r(clampMetric(file.metrics.ird * 0.40 + (1 - intentClarity) * 0.60, 0.08, 0.95));
+  const ios = r(clampMetric(file.metrics.ios * 0.35 + (1 - intentClarity) * 0.65, 0.08, 0.95));
+  const fr = r(clampMetric(file.metrics.fr * 0.70 + ((semanticAlignment + intentClarity) / 2) * 0.30, 0.12, 0.95));
+  const ri = r(clampMetric(file.metrics.ri * 0.55 + intentClarity * 0.25 + semanticAlignment * 0.20, 0.08, 0.95));
+  const cds = r(clampMetric(
+    0.25 * file.metrics.ccd +
+    0.20 * (1 - es) +
+    0.20 * file.metrics.aes +
+    0.15 * file.metrics.rdi +
+    0.10 * file.metrics.cu +
+    0.10 * fr,
+    0.12,
+    0.98,
+  ));
+  const ceb = r(clampMetric(
+    0.25 * ird +
+    0.20 * file.metrics.cfsc +
+    0.20 * file.metrics.stl +
+    0.20 * file.metrics.drc +
+    0.15 * file.metrics.aic,
+    0.10,
+    0.95,
+  ));
+  const dcs = ceb;
+  const actdi = r(clampMetric(
+    0.40 * dcs +
+    0.30 * file.metrics.dps +
+    0.20 * ((file.metrics.ddp + file.metrics.mds) / 2) +
+    0.10 * (1 - ri),
+    0.08,
+    0.98,
+  ));
+  const semanticPenalty = clampMetric((1 - semanticAlignment) * 0.55 + (1 - intentClarity) * 0.45, 0.08, 0.98);
+  const cognitiveDebt = r(clampMetric(file.cognitiveDebt * 0.70 + semanticPenalty * 0.30, 0.12, 0.98));
+
+  const semanticIssues = [
+    ...(semanticAlignment < 0.55 ? ["names do not match implementation intent"] : []),
+    ...(intentClarity < 0.55 ? ["implementation intent is hard to infer"] : []),
+    ...assessment.semanticMismatches.slice(0, 2).map((mismatch) => `semantic mismatch: ${mismatch}`),
+  ];
+
+  return {
+    ...file,
+    cognitiveDebt,
+    issues: [...new Set([...file.issues, ...semanticIssues])].slice(0, 10),
+    explanation: `${file.explanation} Semantic naming review: ${assessment.explanation}`.trim(),
+    metrics: {
+      ...file.metrics,
+      es,
+      ias,
+      ird,
+      ios,
+      fr,
+      ri,
+      cds,
+      ceb,
+      dcs,
+      actdi,
+    },
+  };
 }
 
 // ── ENHANCED TECHNICAL DEBT with SonarQube-style metrics ──
@@ -933,6 +1129,29 @@ serve(async (req) => {
     }
 
     if (fileAnalyses.length === 0) throw new Error('Could not analyze any files');
+
+    if (LOVABLE_API_KEY) {
+      const semanticTargets = [...fileAnalyses]
+        .sort((a, b) => {
+          const aRisk = a.cognitiveDebt + (1 - a.metrics.es) + a.metrics.ias;
+          const bRisk = b.cognitiveDebt + (1 - b.metrics.es) + b.metrics.ias;
+          return bRisk - aRisk;
+        })
+        .slice(0, Math.min(fileAnalyses.length, 8))
+        .map((file) => ({
+          filename: file.file,
+          content: (fileContentsMap.get(file.file) || "").slice(0, 4000),
+        }))
+        .filter((file) => file.content.trim().length > 0);
+
+      const semanticAssessments = await analyzeSemanticNamingViaGateway(semanticTargets, LOVABLE_API_KEY);
+      for (let i = 0; i < fileAnalyses.length; i++) {
+        const assessment = semanticAssessments.get(fileAnalyses[i].file);
+        if (assessment) {
+          fileAnalyses[i] = applySemanticAssessment(fileAnalyses[i], assessment);
+        }
+      }
+    }
 
     const propagation = buildPropagationGraph(fileAnalyses, fileContentsMap);
 

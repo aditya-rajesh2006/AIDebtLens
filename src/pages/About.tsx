@@ -75,7 +75,7 @@ const cognitiveDebtMetrics = [
     desc: "Measures how hard code is to understand by combining structure, naming, and documentation quality.",
     subMetrics: [
       { name: "Cognitive Complexity Drift (CCD)", formula: "CCD = control_flow_keywords / (total_lines * 0.12 + 1)", desc: "Density of control logic that makes code harder to mentally simulate." },
-      { name: "Explainability Score (ES)", formula: "ES = avg_identifier_length / 12", desc: "How meaningful variable and function names are." },
+      { name: "Explainability Score (ES)", formula: "ES = 0.45*semantic_alignment + 0.35*intent_clarity + 0.20*naming_naturalness", desc: "How well variable and function names match the behavior they actually implement." },
       { name: "AI Entropy Score (AES)", formula: "AES = std_dev(line_lengths) / 40", desc: "Structural variation. Extremely uniform code is harder to scan." },
       { name: "Readability Degradation (RDI)", formula: "RDI = 0.8 if comments>30%, 0.3 if 5-30%, 0.55 if <5%", desc: "Balances over-commenting against missing guidance." },
       { name: "Comment Utility (CU)", formula: "CU = 1 - obvious_comments / total_comments", desc: "Measures whether comments add value or restate the code." },
@@ -88,7 +88,7 @@ const cognitiveDebtMetrics = [
     desc: "Models the developer's mental workload while reading and modifying code.",
     subMetrics: [
       { name: "Cognitive Load Index (CLI)", formula: "CLI = nesting + branching + function_length/50", desc: "Represents mental workload during comprehension." },
-      { name: "Identifier Ambiguity (IAS)", formula: "IAS = unclear_names / total_variables", desc: "Higher IAS means more guessing and slower comprehension." },
+      { name: "Identifier Ambiguity (IAS)", formula: "IAS = ambiguity + misleading_name_penalty + semantic_mismatch_penalty", desc: "Higher IAS means more guessing, more misleading names, and slower comprehension." },
       { name: "Abstraction Gap (AGS)", formula: "AGS = |intent_complexity - implementation_complexity|", desc: "Mismatch between what the code should do and how it is implemented." },
       { name: "Readability Index (RI)", formula: "RI = normalized(avg_line_length + nesting + naming)", desc: "Overall readability quality." },
       { name: "Context Switching Cost (CSC)", formula: "CSC = dependencies + cross_file_references", desc: "How often a developer must jump between files." },

@@ -16,9 +16,12 @@ interface CognitiveFileResult {
   comprehensionDebt: number;
   workingMemoryLoad: number;
   namingNaturalness: number;
+  semanticNameAlignment?: number;
+  intentClarity?: number;
   structuralFlow: number;
   abstractionAlignment: number;
   humanTexture: number;
+  semanticMismatches?: string[];
   divergenceSignals: string[];
   pipelineStages: {
     datasetTraining: string;

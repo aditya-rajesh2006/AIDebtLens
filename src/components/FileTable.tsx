@@ -167,7 +167,7 @@ export default function FileTable({ files, selectedFile, onSelectFile }: Props) 
                           {file.metrics.sus > 0.3 && <span className="rounded bg-primary/10 px-1.5 py-0.5">repetitive patterns</span>}
                           {file.metrics.crs > 0.3 && <span className="rounded bg-primary/10 px-1.5 py-0.5">redundant comments</span>}
                           {file.metrics.scs > 0.5 && <span className="rounded bg-primary/10 px-1.5 py-0.5">uniform style</span>}
-                          {file.metrics.ias > 0.3 && <span className="rounded bg-primary/10 px-1.5 py-0.5">generic naming</span>}
+                          {file.metrics.ias > 0.3 && <span className="rounded bg-primary/10 px-1.5 py-0.5">naming mismatch risk</span>}
                           {file.metrics.pri > 0.2 && <span className="rounded bg-primary/10 px-1.5 py-0.5">high repetition</span>}
                         </div>
                       </div>
@@ -232,14 +232,14 @@ export default function FileTable({ files, selectedFile, onSelectFile }: Props) 
                             {[
                               { key: "CDS", formula: "0.25·CCD + 0.20·(1-ES)...", desc: "Combined cognitive components" },
                               { key: "CCD", formula: "control_keywords / lines", desc: "Control flow density" },
-                              { key: "ES", formula: "id_length / 12", desc: "Name clarity and meaning" },
+                              { key: "ES", formula: "semantic_alignment + intent_clarity", desc: "How well names match actual behavior" },
                               { key: "AES", formula: "σ(line_lengths) / 40", desc: "Structural variation" },
                               { key: "RDI", formula: "comment % impact", desc: "Comment balance ratio" },
                               { key: "CU", formula: "1 - obvious / total", desc: "Useful vs restating" },
                               { key: "FR", formula: "length + nesting + name", desc: "Function quality score" },
                               { key: "CEB", formula: "0.25·IRD + 0.20·CFSC...", desc: "Mental simulation effort" },
                               { key: "CLI", formula: "depth + branches + len", desc: "Developer workload" },
-                              { key: "IAS", formula: "unclear / total_vars", desc: "Naming clarity index" },
+                              { key: "IAS", formula: "mismatch + ambiguity penalty", desc: "Misleading or vague identifier risk" },
                               { key: "RI", formula: "line_len + nesting + name", desc: "Overall readability" },
                               { key: "CSC", formula: "deps + cross_refs", desc: "File navigation burden" }
                             ].map(m => (

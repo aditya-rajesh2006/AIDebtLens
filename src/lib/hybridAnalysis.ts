@@ -26,9 +26,12 @@ type HumanCognitiveFile = {
   comprehensionDebt: number;
   workingMemoryLoad: number;
   namingNaturalness: number;
+  semanticNameAlignment?: number;
+  intentClarity?: number;
   structuralFlow: number;
   abstractionAlignment: number;
   humanTexture: number;
+  semanticMismatches?: string[];
   divergenceSignals: string[];
 };
 
@@ -47,8 +50,20 @@ function enrichFile(baseFile: FileAnalysis, aiData?: AiDetectResult, cogData?: H
 
   const comprehensionDebt = cogData?.comprehensionDebt ?? baseFile.cognitiveDebt;
   const divergence = cogData?.cognitiveDivergence ?? baseFile.cognitiveDebt;
+  const semanticAlignment = cogData?.semanticNameAlignment ?? cogData?.namingNaturalness ?? baseFile.metrics.es;
+  const intentClarity = cogData?.intentClarity ?? 1 - baseFile.metrics.ird;
+  const namingNaturalness = cogData?.namingNaturalness ?? baseFile.metrics.es;
+  const semanticPenalty = clamp((1 - semanticAlignment) * 0.55 + (1 - intentClarity) * 0.45);
   const cognitiveWeight = cogData ? 0.4 : 0;
-  const blendedCog = round((1 - cognitiveWeight) * baseFile.cognitiveDebt + cognitiveWeight * comprehensionDebt);
+  const blendedCog = round(
+    clamp(
+      (1 - cognitiveWeight) * baseFile.cognitiveDebt +
+      cognitiveWeight * comprehensionDebt +
+      (cogData ? semanticPenalty * 0.12 : 0),
+      0.12,
+      0.98,
+    ),
+  );
 
   const structuralStress = cogData
     ? clamp(((1 - cogData.structuralFlow) + (1 - cogData.abstractionAlignment) + divergence) / 3)
@@ -57,27 +72,74 @@ function enrichFile(baseFile: FileAnalysis, aiData?: AiDetectResult, cogData?: H
 
   const signals = aiData?.signals ?? [];
   const divergenceSignals = cogData?.divergenceSignals ?? [];
-  const mergedIssues = mergeSignals(baseFile.issues, [...signals, ...divergenceSignals]);
+  const semanticMismatches = cogData?.semanticMismatches ?? [];
+  const semanticIssues = [
+    ...(semanticAlignment < 0.55 ? ["names do not match implementation intent"] : []),
+    ...(intentClarity < 0.55 ? ["implementation intent is hard to infer"] : []),
+    ...semanticMismatches.slice(0, 2).map((mismatch) => `semantic mismatch: ${mismatch}`),
+  ];
+  const mergedIssues = mergeSignals(baseFile.issues, [...signals, ...divergenceSignals, ...semanticIssues]);
+
+  const es = round(clamp(baseFile.metrics.es * 0.35 + semanticAlignment * 0.45 + namingNaturalness * 0.2, 0.12, 0.95));
+  const ias = round(clamp(baseFile.metrics.ias * 0.45 + (1 - semanticAlignment) * 0.35 + (1 - namingNaturalness) * 0.2, 0.08, 0.95));
+  const ird = round(clamp(baseFile.metrics.ird * 0.4 + (1 - intentClarity) * 0.6, 0.08, 0.95));
+  const ios = round(clamp(baseFile.metrics.ios * 0.35 + (1 - intentClarity) * 0.65, 0.08, 0.95));
+  const fr = round(clamp(baseFile.metrics.fr * 0.7 + ((semanticAlignment + intentClarity) / 2) * 0.3, 0.12, 0.95));
+  const ri = round(clamp(baseFile.metrics.ri * 0.55 + (cogData?.structuralFlow ?? baseFile.metrics.ri) * 0.25 + semanticAlignment * 0.2, 0.08, 0.95));
+  const cds = round(clamp(
+    0.25 * baseFile.metrics.ccd +
+    0.2 * (1 - es) +
+    0.2 * baseFile.metrics.aes +
+    0.15 * baseFile.metrics.rdi +
+    0.1 * baseFile.metrics.cu +
+    0.1 * fr,
+    0.12,
+    0.98,
+  ));
+  const ceb = round(clamp(
+    0.25 * ird +
+    0.2 * baseFile.metrics.cfsc +
+    0.2 * baseFile.metrics.stl +
+    0.2 * baseFile.metrics.drc +
+    0.15 * baseFile.metrics.aic,
+    0.1,
+    0.95,
+  ));
+  const dcs = ceb;
+  const actdi = round(clamp(
+    0.4 * dcs +
+    0.3 * baseFile.metrics.dps +
+    0.2 * ((baseFile.metrics.ddp + baseFile.metrics.mds) / 2) +
+    0.1 * (1 - ri),
+    0.08,
+    0.98,
+  ));
 
   const metrics = {
     ...baseFile.metrics,
     sus: round(clamp(baseFile.metrics.sus * 0.7 + blendedAi * 0.3, 0.08, 0.98)),
     pri: round(clamp(baseFile.metrics.pri * 0.75 + blendedAi * 0.2 + structuralStress * 0.05, 0.08, 0.98)),
     tdd: round(clamp(baseFile.metrics.tdd * 0.8 + blendedAi * 0.15, 0.08, 0.98)),
-    cds: round(clamp(baseFile.metrics.cds * 0.65 + blendedCog * 0.35, 0.12, 0.98)),
-    ceb: round(clamp(baseFile.metrics.ceb * 0.7 + comprehensionDebt * 0.3, 0.1, 0.98)),
+    es,
+    cds: round(clamp(baseFile.metrics.cds * 0.45 + cds * 0.55, 0.12, 0.98)),
+    ceb: round(clamp(baseFile.metrics.ceb * 0.35 + ceb * 0.65, 0.1, 0.98)),
     cli: round(clamp(baseFile.metrics.cli * 0.7 + (cogData?.workingMemoryLoad ?? baseFile.metrics.cli) * 0.3, 0.1, 0.98)),
-    ias: round(clamp(baseFile.metrics.ias * 0.75 + (cogData ? 1 - cogData.namingNaturalness : 0) * 0.25, 0.08, 0.95)),
-    ri: round(clamp(baseFile.metrics.ri * 0.7 + (cogData?.structuralFlow ?? baseFile.metrics.ri) * 0.3, 0.08, 0.95)),
+    fr,
+    ias,
+    ri,
+    ird,
+    ios,
+    dcs,
     tds: round(clamp(baseFile.metrics.tds * 0.72 + blendedTech * 0.28, 0.12, 0.98)),
     dps: round(clamp(baseFile.metrics.dps * 0.7 + (0.6 * blendedTech + 0.4 * blendedAi) * 0.3, 0.1, 0.98)),
-    actdi: round(clamp(baseFile.metrics.actdi * 0.7 + (0.5 * blendedCog + 0.3 * blendedTech + 0.2 * blendedAi) * 0.3, 0.08, 0.98)),
+    actdi: round(clamp(baseFile.metrics.actdi * 0.45 + actdi * 0.55, 0.08, 0.98)),
   };
 
   const explanationParts = [
     baseFile.explanation,
     aiData ? `AI verification: ${aiData.explanation}` : "",
-    cogData ? `Human cognitive model: comprehension debt ${(cogData.comprehensionDebt * 100).toFixed(0)}%, divergence ${(cogData.cognitiveDivergence * 100).toFixed(0)}%.` : "",
+    cogData ? `Human cognitive model: comprehension debt ${(cogData.comprehensionDebt * 100).toFixed(0)}%, divergence ${(cogData.cognitiveDivergence * 100).toFixed(0)}%, semantic naming alignment ${(semanticAlignment * 100).toFixed(0)}%.` : "",
+    semanticMismatches.length ? `Semantic review: ${semanticMismatches.slice(0, 2).join("; ")}.` : "",
   ].filter(Boolean);
 
   return {

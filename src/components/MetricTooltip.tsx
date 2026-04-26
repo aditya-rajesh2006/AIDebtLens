@@ -97,8 +97,8 @@ const METRIC_EXPLANATIONS: Record<string, MetricInfo> = {
   },
   "ES": {
     fullName: "Explainability Score",
-    description: "How meaningful variable/function names are. Low ES = confusing names.",
-    formula: "ES = avg_identifier_length / 12",
+    description: "How well names communicate real behavior. Low ES means identifiers may sound plausible but not match the logic.",
+    formula: "ES = 0.45·semantic_alignment + 0.35·intent_clarity + 0.20·naming_naturalness",
   },
   "AES": {
     fullName: "AI Entropy Score",
@@ -129,8 +129,8 @@ const METRIC_EXPLANATIONS: Record<string, MetricInfo> = {
   },
   "IAS": {
     fullName: "Identifier Ambiguity Score",
-    description: "High IAS means more guessing, slower comprehension.",
-    formula: "IAS = unclear_variable_names / total_variables",
+    description: "High IAS means names are vague, misleading, or semantically mismatched with what the code actually does.",
+    formula: "IAS = ambiguity + misleading_names + semantic_mismatch_penalty",
   },
   "AGS": {
     fullName: "Abstraction Gap Score",
@@ -156,8 +156,8 @@ const METRIC_EXPLANATIONS: Record<string, MetricInfo> = {
   },
   "IRD": {
     fullName: "Intent Recognition Difficulty",
-    description: "Effort to infer what the code is trying to do.",
-    formula: "IRD = 1 - intent_transparency",
+    description: "Effort to infer what the code is really trying to do from the implementation and naming together.",
+    formula: "IRD = 1 - intent_clarity",
   },
   "CFSC": {
     fullName: "Control Flow Simulation Cost",
@@ -240,8 +240,8 @@ const METRIC_EXPLANATIONS: Record<string, MetricInfo> = {
   },
   "IOS": {
     fullName: "Intent Obfuscation Score",
-    description: "How hard it is to infer the purpose of the code from its structure.",
-    formula: "IOS = 1 - intent_clarity",
+    description: "How hard it is to infer the purpose of the code when naming and behavior drift apart.",
+    formula: "IOS = 1 - semantic_intent_clarity",
   },
   "HMMD": {
     fullName: "Human Mental Model Divergence",

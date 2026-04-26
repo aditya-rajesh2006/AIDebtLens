@@ -31,6 +31,7 @@ For each file, return structured analysis using the tool provided.
 
 Key cognitive divergence signals:
 - Naming that doesn't match human mental models (too generic, too verbose, misleading)
+- Semantic misalignment where the name suggests one behavior but the implementation does another
 - Structure that fights human reading flow (excessive nesting, non-linear logic)
 - Abstractions that don't map to domain concepts
 - Patterns that require high working memory load
@@ -80,9 +81,16 @@ Key cognitive divergence signals:
                         comprehensionDebt: { type: "number", description: "0-1: cognitive overhead imposed on human readers" },
                         workingMemoryLoad: { type: "number", description: "0-1: mental stack depth required" },
                         namingNaturalness: { type: "number", description: "0-1: how natural variable/function names feel" },
+                        semanticNameAlignment: { type: "number", description: "0-1: how well variable/function names match the actual logic and behavior" },
+                        intentClarity: { type: "number", description: "0-1: how easy it is to infer the true purpose of the code from names plus implementation" },
                         structuralFlow: { type: "number", description: "0-1: how well structure follows human reading flow" },
                         abstractionAlignment: { type: "number", description: "0-1: how well abstractions map to domain concepts" },
                         humanTexture: { type: "number", description: "0-1: presence of human coding 'texture' (idioms, shortcuts)" },
+                        semanticMismatches: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Short examples of misleading or semantically mismatched names"
+                        },
                         divergenceSignals: {
                           type: "array",
                           items: { type: "string" },
@@ -100,7 +108,7 @@ Key cognitive divergence signals:
                           required: ["datasetTraining", "cognitiveModel", "aiAnalysis", "divergenceMetrics", "debtScore"]
                         }
                       },
-                      required: ["filename", "humanBaselineMatch", "cognitiveDivergence", "comprehensionDebt", "workingMemoryLoad", "namingNaturalness", "structuralFlow", "abstractionAlignment", "humanTexture", "divergenceSignals", "pipelineStages"]
+                      required: ["filename", "humanBaselineMatch", "cognitiveDivergence", "comprehensionDebt", "workingMemoryLoad", "namingNaturalness", "semanticNameAlignment", "intentClarity", "structuralFlow", "abstractionAlignment", "humanTexture", "semanticMismatches", "divergenceSignals", "pipelineStages"]
                     }
                   },
                   overallAssessment: {

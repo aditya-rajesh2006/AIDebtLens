@@ -649,7 +649,6 @@ export default function Dashboard() {
                             {chartData?.map((_, i) => <Cell key={i} fill="hsl(270, 72%, 62%)" fillOpacity={0.75} />)}
                           </Bar>
                         </BarChart>
-                          </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </motion.div>
@@ -664,7 +663,6 @@ export default function Dashboard() {
                           </Pie>
                           <Tooltip contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 11 }} />
                         </PieChart>
-                          </PieChart>
                         </ResponsiveContainer>
                       </div>
                       <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground">
@@ -698,7 +696,6 @@ export default function Dashboard() {
                             `${value}%`, METRIC_FULL_NAMES[props.payload?.metric] || props.payload?.metric
                           ]} />
                         </RadarChart>
-                          </RadarChart>
                         </ResponsiveContainer>
                       </div>
                     </motion.div>
@@ -721,7 +718,6 @@ export default function Dashboard() {
                             `${value}%`, METRIC_FULL_NAMES[props.payload?.metric] || props.payload?.metric
                           ]} />
                         </RadarChart>
-                          </RadarChart>
                         </ResponsiveContainer>
                       </div>
                       <div className="text-center mt-1">

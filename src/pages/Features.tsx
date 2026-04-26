@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 const features = [
   { icon: Code, title: "AI Code Detection", desc: "Heuristic engine detects overly generic names, repetitive structures, unusual verbosity, inconsistent conventions, and excessive obvious comments. Outputs AI Likelihood Score (0–1) per file.", category: "Detection" },
   { icon: Layers, title: "Technical Debt Analysis", desc: "Detects duplication, high cyclomatic complexity, deep nesting, poor modularization, and unused logic. Separates AI-induced debt from general debt.", category: "Analysis" },
-  { icon: Brain, title: "Cognitive Debt Scoring", desc: "Four proprietary metrics: Cognitive Complexity Drift (CCD), Explainability Score (ES), AI Entropy Score (AES), and Readability Degradation Index (RDI).", category: "Core" },
+  { icon: Brain, title: "Cognitive Debt Scoring", desc: "Four core metrics: Cognitive Complexity Drift (CCD), Explainability Score (ES) with semantic naming alignment, AI Entropy Score (AES), and Readability Degradation Index (RDI).", category: "Core" },
   { icon: GitFork, title: "Propagation Tracking", desc: "Maps how AI-induced debt spreads via code clones, reused patterns, repeated commits, and dependency chains. Traces back to root cause.", category: "Tracking" },
   { icon: Activity, title: "Interactive Graph", desc: "Force-directed propagation graph with nodes as files/functions and edges as debt paths. Color-coded by risk level.", category: "Visualization" },
   { icon: BarChart3, title: "Metrics Dashboard", desc: "Unified view of DPS, DLI, DRF, CCD, ES, AES, RDI, AI Likelihood, and AI Debt Contribution % across all files.", category: "Dashboard" },
